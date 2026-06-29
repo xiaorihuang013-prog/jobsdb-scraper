@@ -94,9 +94,49 @@ python3 export_excel.py --input "工作 - Sheet1.csv" --output "岗位收集.xls
 - 大搜索量建议 `--max-pages` 分批处理
 - 特殊分类可用 `--classification-id` 手动指定 API 分类 ID
 
-## 搭配 Claude Code 使用
+## Claude Code Skill 配置
 
-将此目录放入 `.claude/skills/` 并配置 skill 文件，即可在 Claude Code 中一键执行：
+将此项目配置为 Claude Code Skill，即可在对话中一键执行 `/jobsdb-scraper`。
+
+### 1. Clone 项目
+
+```bash
+git clone https://github.com/xiaorihuang013-prog/jobsdb-scraper.git
+cd jobsdb-scraper
+pip3 install openpyxl
 ```
-/jobsdb-scraper "搜索URL" --existing "基准文件.csv"
+
+### 2. 将 SKILL.md 复制到项目
+
+```bash
+# 在你的工作目录中
+mkdir -p .claude/skills
+cp jobsdb-scraper/SKILL.md .claude/skills/jobsdb-scraper.md
 ```
+
+或者放到全局 skill 目录（所有项目通用）：
+
+```bash
+cp jobsdb-scraper/SKILL.md ~/.claude/skills/jobsdb-scraper.md
+```
+
+### 3. 在 Claude Code 中使用
+
+```
+/jobsdb-scraper "https://hk.jobsdb.com/jobs-in-marketing-communications/full-time/on-site?salaryrange=20000-25000&salarytype=monthly" --existing "工作 - Sheet1.csv"
+```
+
+Claude 会自动执行全部 6 步：分页抓取 → 去重 → JD 提取 → 公司补全 → CSV 更新 → Excel 输出。
+
+### Skill 文件说明
+
+`SKILL.md` 文件顶部的 YAML frontmatter 是 Claude Code 识别 skill 的关键：
+
+```yaml
+---
+name: jobsdb-scraper          # skill 名称，对应 /jobsdb-scraper 命令
+description: ...              # 描述，在 skill 列表中展示
+---
+```
+
+修改 `name` 字段可自定义命令名称，修改后文件名需与 `name` 一致。
