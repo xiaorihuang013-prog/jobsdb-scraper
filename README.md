@@ -4,13 +4,11 @@
 
 ## 輸入 → 輸出
 
-**輸入**：一個 Jobsdb HK 搜尋 URL + 用於去重的基準檔案（`.csv` 或 `.xlsx`）
+**輸入**：
+- **必填**：一個 Jobsdb HK 搜尋 URL
+- **可選**：一個本地基準檔案（`.csv` 或 `.xlsx`），用於去重與增量更新
 
-```
-https://hk.jobsdb.com/jobs-in-marketing-communications/full-time/on-site?salaryrange=20000-25000&salarytype=monthly
-```
-
-**輸出**：格式化的 `.xlsx` 檔案 + 更新後的 CSV
+**輸出**：格式化的 `.xlsx` 檔案（+ 更新後的基準檔案，如有提供）
 
 | # | 欄位 | 資料來源 |
 |---|------|---------|
@@ -21,9 +19,9 @@ https://hk.jobsdb.com/jobs-in-marketing-communications/full-time/on-site?salaryr
 | 5 | 公司評分 | Google `"{公司}" glassdoor rating` 摘要提取 |
 | 6 | 職位名稱 | API |
 | 7 | 薪資範圍 | API |
-| 8 | 工作描述 | 詳情頁 JS 渲染內容提取（完整 JD） |
+| 8 | 工作描述 | 詳情頁完整 JD |
 | 9 | 地點 | API |
-| 10 | 職位連結 | 構造自 job ID |
+| 10 | 職位連結 | `/zh/job/{id}` |
 
 ## 依賴
 
@@ -35,24 +33,42 @@ pip3 install openpyxl
 
 ## 快速開始
 
-```bash
-# 1. 抓取全部崗位（自動分頁）
-python3 fetch_jobs.py "https://hk.jobsdb.com/jobs-in-{分類}/full-time/on-site?...參數" -o /tmp/all_jobs.json
+### 場景 A：首次收集（僅有搜尋 URL）
 
-# 2. 去重（對比已有 CSV 或 Excel）
-python3 dedup_append.py --new /tmp/all_jobs.json --existing "工作 - Sheet1.csv" --output /tmp/new.json
+```bash
+# 1. 抓取全部崗位
+python3 fetch_jobs.py "<搜尋URL>" -o /tmp/all_jobs.json
+
+# 2. 獲取完整 JD
+python3 fetch_jd.py --input /tmp/all_jobs.json --output /tmp/new_jd.json
+
+# 3. 補全公司資訊
+python3 enrich_company.py --input /tmp/new_jd.json --output /tmp/new_enriched.json
+
+# 4. 生成 Excel
+python3 export_excel.py --new-only /tmp/new_enriched.json --output "崗位收集.xlsx"
+```
+
+### 場景 B：增量更新（有搜尋 URL + 本地基準檔案）
+
+```bash
+# 1. 抓取全部崗位
+python3 fetch_jobs.py "<搜尋URL>" -o /tmp/all_jobs.json
+
+# 2. 去重
+python3 dedup_append.py --new /tmp/all_jobs.json --existing "<本地基準檔案>" --output /tmp/new.json
 
 # 3. 獲取完整 JD
 python3 fetch_jd.py --input /tmp/new.json --output /tmp/new_jd.json
 
-# 4. 補全公司資訊（評分 + 類型 + 行業）
+# 4. 補全公司資訊
 python3 enrich_company.py --input /tmp/new_jd.json --output /tmp/new_enriched.json
 
-# 5. 寫入 CSV
-python3 dedup_append.py --new /tmp/new_enriched.json --existing "工作 - Sheet1.csv" --updated-csv "工作 - Sheet1.csv"
+# 5. 寫入基準檔案
+python3 dedup_append.py --new /tmp/new_enriched.json --existing "<本地基準檔案>" --updated-csv "<本地基準檔案>" --enriched
 
 # 6. 生成 Excel
-python3 export_excel.py --input "工作 - Sheet1.csv" --output "崗位收集.xlsx"
+python3 export_excel.py --input "<本地基準檔案>" --output "崗位收集.xlsx"
 ```
 
 ## 如何工作
@@ -85,7 +101,7 @@ python3 export_excel.py --input "工作 - Sheet1.csv" --output "崗位收集.xls
 | `fetch_jd.py` | 遍歷崗位 ID → curl 詳情頁 → 提取完整 JD |
 | `enrich_company.py` | 收集唯一公司 → Google 批量查評分+總部 → 行業映射 |
 | `dedup_append.py` | 讀取 CSV/Excel → 去重 → 追加寫入 |
-| `export_excel.py` | 讀取 CSV → openpyxl 生成格式化 xlsx |
+| `export_excel.py` | 讀取 CSV 或 JSON → openpyxl 生成格式化 xlsx |
 
 ## Claude Code Skill 配置
 
@@ -115,11 +131,17 @@ cp jobsdb-scraper/SKILL.md ~/.claude/skills/jobsdb-scraper.md
 
 ### 3. 在 Claude Code 中使用
 
+僅提供 URL（首次收集）：
 ```
-/jobsdb-scraper "https://hk.jobsdb.com/jobs-in-marketing-communications/full-time/on-site?salaryrange=20000-25000&salarytype=monthly" --existing "工作 - Sheet1.csv"
+/jobsdb-scraper "<搜尋URL>"
 ```
 
-Claude 會自動執行全部 6 步：分頁抓取 → 去重 → JD 提取 → 公司補全 → CSV 更新 → Excel 輸出。
+提供 URL + 本地檔案（增量更新）：
+```
+/jobsdb-scraper "<搜尋URL>" --existing "<本地基準檔案>"
+```
+
+Claude 會根據是否提供檔案自動選擇場景 A 或場景 B。
 
 ### Skill 檔案說明
 
