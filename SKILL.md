@@ -1,40 +1,40 @@
 ---
 name: jobsdb-scraper
-description: 从 Jobsdb HK 搜索 URL 批量抓取岗位信息，自动补全公司评分/类型/行业，输出格式化 Excel
+description: 從 Jobsdb HK 搜尋 URL 批量抓取崗位資訊，自動補全公司評分/類型/行業，輸出格式化 Excel
 ---
 
 # Jobsdb Job Scraper
 
-批量抓取 [Jobsdb Hong Kong](https://hk.jobsdb.com) 岗位信息，自动获取完整 JD、Glassdoor 评分、公司类型、行业分类，输出格式化 Excel。
+批量抓取 [Jobsdb Hong Kong](https://hk.jobsdb.com) 崗位資訊，自動獲取完整 JD、Glassdoor 評分、公司類型、行業分類，輸出格式化 Excel。
 
-## 输入
+## 輸入
 
-- 一个 Jobsdb HK 搜索 URL：`https://hk.jobsdb.com/jobs-in-{分类}/full-time/on-site?salaryrange=20000-25000&salarytype=monthly`
-- 用于去重的基准文件路径（`.csv` 或 `.xlsx`）
+- 一個 Jobsdb HK 搜尋 URL：`https://hk.jobsdb.com/jobs-in-{分類}/full-time/on-site?salaryrange=20000-25000&salarytype=monthly`
+- 用於去重的基準檔案路徑（`.csv` 或 `.xlsx`）
 
-## 执行步骤
+## 執行步驟
 
-### Step 1: 抓取全部岗位
+### Step 1: 抓取全部崗位
 
 ```bash
-python3 fetch_jobs.py "<搜索URL>" -o /tmp/all_jobs.json
+python3 fetch_jobs.py "<搜尋URL>" -o /tmp/all_jobs.json
 ```
 
-自动从 URL 解析 API 参数 → 获取 `totalCount` → 遍历所有分页 → 合并输出 JSON。
+自動從 URL 解析 API 參數 → 獲取 `totalCount` → 遍歷所有分頁 → 合併輸出 JSON。
 
 ### Step 2: 去重
 
 ```bash
 python3 dedup_append.py \
   --new /tmp/all_jobs.json \
-  --existing "<基准文件.csv或.xlsx>" \
+  --existing "<基準檔案.csv或.xlsx>" \
   --output /tmp/new_unique.json \
-  --updated-csv "<基准文件.csv>"
+  --updated-csv "<基準檔案.csv>"
 ```
 
-按 job ID（URL 提取）+ 标准化公司名双重去重。自动识别基准文件格式。
+按 job ID（URL 提取）+ 標準化公司名雙重去重。自動識別基準檔案格式。
 
-### Step 3: 获取完整 JD
+### Step 3: 獲取完整 JD
 
 ```bash
 python3 fetch_jd.py \
@@ -42,9 +42,9 @@ python3 fetch_jd.py \
   --output /tmp/new_with_jd.json
 ```
 
-通过 `/zh/job/{id}` 绕过 Cloudflare，从 `<script>` 标签 JSON 提取 JD。
+透過 `/zh/job/{id}` 繞過 Cloudflare，從 `<script>` 標籤 JSON 提取 JD。
 
-### Step 4: 公司信息补全
+### Step 4: 公司資訊補全
 
 ```bash
 python3 enrich_company.py \
@@ -52,17 +52,17 @@ python3 enrich_company.py \
   --output /tmp/new_enriched.json
 ```
 
-- **评分**：Google `"{公司}" glassdoor rating`，摘要提取评分数字
-- **类型**：规则映射 → Google `"{公司}" 总部` 提取国家 → "待确认"
-- **行业**：API subclassification → 中文映射
+- **評分**：Google `"{公司}" glassdoor rating`，摘要提取評分數字
+- **類型**：規則映射 → Google `"{公司}" 總部` 提取國家 → "待確認"
+- **行業**：API subclassification → 中文映射
 
-### Step 5: 写入 CSV
+### Step 5: 寫入 CSV
 
 ```bash
 python3 dedup_append.py \
   --new /tmp/new_enriched.json \
-  --existing "<基准文件.csv>" \
-  --updated-csv "<基准文件.csv>" \
+  --existing "<基準檔案.csv>" \
+  --updated-csv "<基準檔案.csv>" \
   --enriched
 ```
 
@@ -70,28 +70,28 @@ python3 dedup_append.py \
 
 ```bash
 python3 export_excel.py \
-  --input "<基准文件.csv>" \
-  --output "岗位收集_{关键词}_{日期}.xlsx"
+  --input "<基準檔案.csv>" \
+  --output "崗位收集_{關鍵詞}_{日期}.xlsx"
 ```
 
-## 输出字段
+## 輸出欄位
 
-| # | 字段 | 来源 |
+| # | 欄位 | 來源 |
 |---|------|------|
-| 1 | 序号 | 自增 |
-| 2 | 类型 | 规则 + Google 搜索 |
-| 3 | 行业 | API 中文映射 |
+| 1 | 序號 | 自增 |
+| 2 | 類型 | 規則 + Google 搜尋 |
+| 3 | 行業 | API 中文映射 |
 | 4 | 公司 | API |
-| 5 | 公司评分 | Glassdoor 摘要提取 |
-| 6 | 职位名称 | API |
-| 7 | 薪资范围 | API |
-| 8 | 工作描述 | 详情页完整 JD |
-| 9 | 地点 | API |
-| 10 | 职位链接 | `/zh/job/{id}` |
+| 5 | 公司評分 | Glassdoor 摘要提取 |
+| 6 | 職位名稱 | API |
+| 7 | 薪資範圍 | API |
+| 8 | 工作描述 | 詳情頁完整 JD |
+| 9 | 地點 | API |
+| 10 | 職位連結 | `/zh/job/{id}` |
 
-## 注意事项
+## 注意事項
 
-- 依赖 `openpyxl`：`pip3 install openpyxl`
-- Google 搜索 2.5s 间隔，避免限流
-- JD 依赖 `/zh/` 路径绕过 Cloudflare
-- 大搜索量建议 `--max-pages` 分批处理
+- 依賴 `openpyxl`：`pip3 install openpyxl`
+- Google 搜尋 2.5s 間隔，避免限流
+- JD 依賴 `/zh/` 路徑繞過 Cloudflare
+- 大搜尋量建議 `--max-pages` 分批處理
